@@ -31,7 +31,7 @@ fi
 
 echo -e "${CYAN}🚀 Opening dashboard browser...${RESET}"
 echo ""
-echo -e "  ${GREEN}•${RESET} Browse ${BOLD}117 templates${RESET}"
+echo -e "  ${GREEN}•${RESET} Browse ${BOLD}128 templates${RESET}"
 echo -e "  ${GREEN}•${RESET} Search and filter by category"
 echo -e "  ${GREEN}•${RESET} Click any template to preview"
 echo ""
