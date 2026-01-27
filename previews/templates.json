@@ -470,6 +470,16 @@
 }
 ,
 {
+  "name": "defi-portfolio",
+  "file": "defi-portfolio.sh",
+  "description": "BlackRoad OS - DeFi Portfolio Tracker Real-time DeFi positions, yields, and protocol analytics Colors ",
+  "category": "crypto",
+  "interactive": true,
+  "has_sound": false,
+  "has_api": false
+}
+,
+{
   "name": "deployment-timeline",
   "file": "deployment-timeline.sh",
   "description": "BlackRoad OS - Deployment Timeline Visualize all deployments across time with Gantt-style charts ",
@@ -580,6 +590,16 @@
 }
 ,
 {
+  "name": "firewall-monitor",
+  "file": "firewall-monitor.sh",
+  "description": "BlackRoad OS - Firewall Monitor Real-time firewall rules, traffic analysis, and threat detection Colors ",
+  "category": "monitoring",
+  "interactive": true,
+  "has_sound": false,
+  "has_api": true
+}
+,
+{
   "name": "fusion-reactor",
   "file": "fusion-reactor.sh",
   "description": "",
@@ -614,6 +634,16 @@
   "file": "genetic-engineering.sh",
   "description": "BlackRoad OS - Genetic Engineering Lab CRISPR gene editing and genome engineering Show genetic engineering dashboard ",
   "category": "general",
+  "interactive": true,
+  "has_sound": false,
+  "has_api": false
+}
+,
+{
+  "name": "geographic-map",
+  "file": "geographic-map.sh",
+  "description": "BlackRoad OS - Geographic Data Map Visualize global data distribution with ASCII world map Colors ",
+  "category": "visualization",
   "interactive": true,
   "has_sound": false,
   "has_api": false
@@ -670,6 +700,16 @@
 }
 ,
 {
+  "name": "intrusion-detection",
+  "file": "intrusion-detection.sh",
+  "description": "BlackRoad OS - Intrusion Detection System Real-time IDS alerts, attack patterns, and security monitoring Colors ",
+  "category": "security",
+  "interactive": true,
+  "has_sound": false,
+  "has_api": false
+}
+,
+{
   "name": "invoice-automation",
   "file": "invoice-automation.sh",
   "description": "BlackRoad OS - Invoice Automation Automated invoice generation, tracking, and payment reminders Company details ",
@@ -677,6 +717,16 @@
   "interactive": true,
   "has_sound": false,
   "has_api": false
+}
+,
+{
+  "name": "kubernetes-cluster",
+  "file": "kubernetes-cluster.sh",
+  "description": "BlackRoad OS - Kubernetes Cluster Monitor Real-time K8s cluster metrics, pod health, and resource utilization Colors ",
+  "category": "infrastructure",
+  "interactive": true,
+  "has_sound": false,
+  "has_api": true
 }
 ,
 {
@@ -720,6 +770,16 @@
 }
 ,
 {
+  "name": "llm-inference",
+  "file": "llm-inference.sh",
+  "description": "BlackRoad OS - LLM Inference Monitor Real-time monitoring of large language model inference serving Colors ",
+  "category": "ai",
+  "interactive": true,
+  "has_sound": false,
+  "has_api": false
+}
+,
+{
   "name": "log-aggregator",
   "file": "log-aggregator.sh",
   "description": "BlackRoad OS - Log Aggregator Real-time log aggregation from all services and devices ",
@@ -744,6 +804,16 @@
   "file": "memory-system-viz.sh",
   "description": "BlackRoad OS - Memory System Visualization PS-SHA∞ memory chains, agent collaboration, live context ",
   "category": "monitoring",
+  "interactive": true,
+  "has_sound": false,
+  "has_api": false
+}
+,
+{
+  "name": "model-training",
+  "file": "model-training.sh",
+  "description": "BlackRoad OS - AI Model Training Dashboard Real-time ML model training metrics, loss curves, and performance Colors ",
+  "category": "ai",
   "interactive": true,
   "has_sound": false,
   "has_api": false
@@ -794,6 +864,16 @@
   "file": "neural-network-viz.sh",
   "description": "BlackRoad OS - Neural Network Visualizer Watch neural networks learn in real-time Show neural network dashboard ",
   "category": "ai",
+  "interactive": true,
+  "has_sound": false,
+  "has_api": false
+}
+,
+{
+  "name": "nft-gallery",
+  "file": "nft-gallery.sh",
+  "description": "BlackRoad OS - NFT Gallery Dashboard Track your NFT collection, floor prices, and marketplace activity Colors ",
+  "category": "crypto",
   "interactive": true,
   "has_sound": false,
   "has_api": false
@@ -857,6 +937,16 @@
   "interactive": false,
   "has_sound": false,
   "has_api": false
+}
+,
+{
+  "name": "preview-demo",
+  "file": "preview-demo.sh",
+  "description": "BlackRoad OS - Preview System Demo Shows what the preview browser looks like Colors ",
+  "category": "general",
+  "interactive": false,
+  "has_sound": false,
+  "has_api": true
 }
 ,
 {
@@ -973,7 +1063,7 @@
   "name": "services-ports-map",
   "file": "services-ports-map.sh",
   "description": "BlackRoad OS - Services & Ports Map Monitor all running services, ports, and network endpoints ",
-  "category": "general",
+  "category": "visualization",
   "interactive": true,
   "has_sound": false,
   "has_api": true
@@ -1117,6 +1207,26 @@
   "interactive": true,
   "has_sound": false,
   "has_api": true
+}
+,
+{
+  "name": "timeline-visualizer",
+  "file": "timeline-visualizer.sh",
+  "description": "BlackRoad OS - Timeline Visualizer Visualize events, milestones, and project timelines Colors ",
+  "category": "visualization",
+  "interactive": true,
+  "has_sound": false,
+  "has_api": true
+}
+,
+{
+  "name": "token-analytics",
+  "file": "token-analytics.sh",
+  "description": "BlackRoad OS - Token Analytics Dashboard Deep dive into token metrics, on-chain data, and trading analysis Colors ",
+  "category": "crypto",
+  "interactive": true,
+  "has_sound": false,
+  "has_api": false
 }
 ,
 {
