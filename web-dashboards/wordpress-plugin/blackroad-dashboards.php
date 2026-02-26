@@ -71,7 +71,7 @@ class BlackRoad_Dashboards {
         
         $output .= '<script>
             jQuery(document).ready(function($) {
-                new ' . $dashboard_class . '("' . $dashboard_id . '", {
+                new ' . esc_js($dashboard_class) . '("' . esc_js($dashboard_id) . '", {
                     refreshInterval: ' . intval($atts['refresh']) . ',
                     theme: "' . esc_js($atts['theme']) . '",
                     showControls: ' . ($atts['controls'] === 'true' ? 'true' : 'false') . '
