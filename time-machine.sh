@@ -1,253 +1,266 @@
 #!/bin/bash
+#═══════════════════════════════════════════════════════════════════════════════
+#  ████████╗██╗███╗   ███╗███████╗    ███╗   ███╗ █████╗  ██████╗██╗  ██╗██╗███╗   ██╗███████╗
+#  ╚══██╔══╝██║████╗ ████║██╔════╝    ████╗ ████║██╔══██╗██╔════╝██║  ██║██║████╗  ██║██╔════╝
+#     ██║   ██║██╔████╔██║█████╗      ██╔████╔██║███████║██║     ███████║██║██╔██╗ ██║█████╗
+#     ██║   ██║██║╚██╔╝██║██╔══╝      ██║╚██╔╝██║██╔══██║██║     ██╔══██║██║██║╚██╗██║██╔══╝
+#     ██║   ██║██║ ╚═╝ ██║███████╗    ██║ ╚═╝ ██║██║  ██║╚██████╗██║  ██║██║██║ ╚████║███████╗
+#     ╚═╝   ╚═╝╚═╝     ╚═╝╚══════╝    ╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝
+#═══════════════════════════════════════════════════════════════════════════════
+#  BLACKROAD TIME MACHINE v3.0
+#  Historical Data Recording, Replay & Trend Analysis
+#═══════════════════════════════════════════════════════════════════════════════
 
-# BlackRoad OS - Time Machine Dashboard
-# Travel through your infrastructure's history
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[[ -f "$SCRIPT_DIR/lib-core.sh" ]] && source "$SCRIPT_DIR/lib-core.sh"
 
-source ~/blackroad-dashboards/themes.sh
-load_theme
+#───────────────────────────────────────────────────────────────────────────────
+# CONFIGURATION
+#───────────────────────────────────────────────────────────────────────────────
 
-HISTORY_FILE=~/blackroad-dashboards/.time_machine_history
-CURRENT_TIME=$(date +%s)
-TIME_POSITION=$CURRENT_TIME
-PLAYBACK_SPEED=1
+DATA_DIR="${BLACKROAD_HOME:-$HOME/.blackroad-dashboards}/timemachine"
+SNAPSHOTS_DIR="$DATA_DIR/snapshots"
+RECORDINGS_DIR="$DATA_DIR/recordings"
+EVENTS_FILE="$DATA_DIR/events.log"
 
-# Initialize history
-touch "$HISTORY_FILE"
+mkdir -p "$SNAPSHOTS_DIR" "$RECORDINGS_DIR" 2>/dev/null
+touch "$EVENTS_FILE" 2>/dev/null
 
-# Add historical events
-init_history() {
-    if [ ! -s "$HISTORY_FILE" ]; then
-        local now=$(date +%s)
+# Recording state
+RECORDING_ACTIVE=false
+RECORDING_NAME=""
+RECORDING_START=0
 
-        # Generate 30 days of history
-        for ((i=30; i>=0; i--)); do
-            local timestamp=$((now - i * 86400))
-            local cpu=$((30 + RANDOM % 40))
-            local memory=$((4 + RANDOM % 3))
-            local containers=$((20 + RANDOM % 8))
+#───────────────────────────────────────────────────────────────────────────────
+# SNAPSHOT MANAGEMENT
+#───────────────────────────────────────────────────────────────────────────────
 
-            echo "$timestamp|cpu:$cpu|memory:${memory}.${RANDOM:0:1}|containers:$containers|deployments:$((RANDOM % 5))" >> "$HISTORY_FILE"
-        done
-    fi
+take_snapshot() {
+    local name="${1:-snapshot_$(date +%Y%m%d_%H%M%S)}"
+    local snapshot_file="$SNAPSHOTS_DIR/${name}.json"
+
+    local cpu=$(grep 'cpu ' /proc/stat 2>/dev/null | awk '{usage=($2+$4)*100/($2+$4+$5)} END {printf "%.1f", usage}' || echo "0")
+    local mem=$(free 2>/dev/null | awk '/Mem:/ {printf "%.1f", $3/$2 * 100}' || echo "0")
+    local disk=$(df / 2>/dev/null | awk 'NR==2 {print $5}' | tr -d '%' || echo "0")
+    local load=$(cat /proc/loadavg 2>/dev/null | awk '{print $1}' || echo "0")
+    local connections=$(netstat -tunapl 2>/dev/null | grep -c ESTABLISHED || echo "0")
+    local docker_count=$(docker ps -q 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+
+    cat > "$snapshot_file" << EOF
+{
+    "name": "$name",
+    "timestamp": "$(date -Iseconds)",
+    "epoch": $(date +%s),
+    "metrics": {
+        "cpu": $cpu,
+        "memory": $mem,
+        "disk": $disk,
+        "load": $load,
+        "connections": $connections,
+        "docker_containers": $docker_count
+    },
+    "hostname": "$(hostname)",
+    "uptime": "$(uptime -p 2>/dev/null || uptime)"
+}
+EOF
+
+    printf "${BR_GREEN}Snapshot saved: %s${RST}\n" "$name"
 }
 
-# Format timestamp
-format_time() {
-    local timestamp=$1
-    date -r "$timestamp" "+%Y-%m-%d %H:%M:%S"
-}
+list_snapshots() {
+    printf "${BOLD}Snapshots${RST}\n\n"
+    printf "%-30s %-20s %-10s %-10s\n" "NAME" "TIMESTAMP" "CPU" "MEM"
+    printf "${TEXT_MUTED}%s${RST}\n" "────────────────────────────────────────────────────────────────"
 
-# Get data at specific time
-get_historical_data() {
-    local target_time=$1
-
-    # Find closest historical record
-    local closest_line=$(awk -F'|' -v target="$target_time" '
-        BEGIN { min_diff=999999999; closest="" }
-        {
-            diff = ($1 > target) ? $1 - target : target - $1
-            if (diff < min_diff) {
-                min_diff = diff
-                closest = $0
-            }
-        }
-        END { print closest }
-    ' "$HISTORY_FILE")
-
-    echo "$closest_line"
-}
-
-# Show time machine dashboard
-show_time_machine() {
-    clear
-    echo ""
-    echo -e "${BOLD}${GOLD}╔════════════════════════════════════════════════════════════════════════╗${RESET}"
-    echo -e "${BOLD}${GOLD}║${RESET}  ${PURPLE}⏰${RESET} ${BOLD}TIME MACHINE DASHBOARD${RESET}                                          ${BOLD}${GOLD}║${RESET}"
-    echo -e "${BOLD}${GOLD}╚════════════════════════════════════════════════════════════════════════╝${RESET}"
-    echo ""
-
-    local current_data=$(get_historical_data "$TIME_POSITION")
-    local time_str=$(format_time "$TIME_POSITION")
-
-    # Time indicator
-    echo -e "${TEXT_MUTED}╭─ TIME TRAVEL ─────────────────────────────────────────────────────────╮${RESET}"
-    echo ""
-
-    local time_diff=$((CURRENT_TIME - TIME_POSITION))
-    local days_ago=$((time_diff / 86400))
-
-    if [ $days_ago -eq 0 ]; then
-        echo -e "  ${BOLD}${GREEN}◉ LIVE${RESET}  ${CYAN}$time_str${RESET}"
-    else
-        echo -e "  ${BOLD}${ORANGE}◉ $days_ago days ago${RESET}  ${CYAN}$time_str${RESET}"
-    fi
-    echo ""
-
-    # Timeline
-    echo -e "${TEXT_MUTED}╭─ TIMELINE ────────────────────────────────────────────────────────────╮${RESET}"
-    echo ""
-
-    local total_days=30
-    local position_days=$(( (CURRENT_TIME - TIME_POSITION) / 86400 ))
-    local bar_position=$((50 - position_days * 50 / total_days))
-
-    echo -n "  ${TEXT_MUTED}30d ago${RESET}  "
-    for ((i=0; i<50; i++)); do
-        if [ $i -eq $bar_position ]; then
-            echo -n "${GOLD}◆${RESET}"
-        else
-            echo -n "${TEXT_MUTED}─${RESET}"
+    for snapshot_file in "$SNAPSHOTS_DIR"/*.json; do
+        [[ ! -f "$snapshot_file" ]] && continue
+        if command -v jq &>/dev/null; then
+            local name=$(jq -r '.name' "$snapshot_file" 2>/dev/null)
+            local timestamp=$(jq -r '.timestamp' "$snapshot_file" 2>/dev/null)
+            local cpu=$(jq -r '.metrics.cpu' "$snapshot_file" 2>/dev/null)
+            local mem=$(jq -r '.metrics.memory' "$snapshot_file" 2>/dev/null)
+            printf "%-30s %-20s %8.1f%% %8.1f%%\n" "${name:0:30}" "${timestamp:0:20}" "$cpu" "$mem"
         fi
     done
-    echo " ${GREEN}NOW${RESET}"
-    echo ""
-
-    # Historical metrics
-    echo -e "${TEXT_MUTED}╭─ METRICS AT THIS TIME ────────────────────────────────────────────────╮${RESET}"
-    echo ""
-
-    if [ -n "$current_data" ]; then
-        local cpu=$(echo "$current_data" | grep -o 'cpu:[0-9]*' | cut -d: -f2)
-        local memory=$(echo "$current_data" | grep -o 'memory:[0-9.]*' | cut -d: -f2)
-        local containers=$(echo "$current_data" | grep -o 'containers:[0-9]*' | cut -d: -f2)
-        local deployments=$(echo "$current_data" | grep -o 'deployments:[0-9]*' | cut -d: -f2)
-
-        echo -e "  ${BOLD}${TEXT_PRIMARY}CPU Usage:${RESET}"
-        echo -n "    ${ORANGE}"
-        for ((i=0; i<cpu/2; i++)); do echo -n "█"; done
-        echo -e "${TEXT_MUTED}$(for ((i=cpu/2; i<50; i++)); do echo -n "░"; done)${RESET}  ${BOLD}${cpu}%${RESET}"
-        echo ""
-
-        echo -e "  ${BOLD}${TEXT_PRIMARY}Memory:${RESET}             ${BOLD}${PINK}${memory} GB${RESET}"
-        echo -e "  ${BOLD}${TEXT_PRIMARY}Containers:${RESET}         ${BOLD}${CYAN}${containers}${RESET}"
-        echo -e "  ${BOLD}${TEXT_PRIMARY}Deployments:${RESET}        ${BOLD}${GREEN}${deployments}${RESET}"
-    else
-        echo -e "  ${TEXT_MUTED}No data available at this time${RESET}"
-    fi
-    echo ""
-
-    # Historical events
-    echo -e "${TEXT_MUTED}╭─ EVENTS AT THIS TIME ─────────────────────────────────────────────────╮${RESET}"
-    echo ""
-
-    echo -e "  ${GREEN}●${RESET} ${TEXT_MUTED}[$(format_time $((TIME_POSITION - 3600)))]${RESET} Deployment: ${CYAN}api-v2.3.1${RESET}"
-    echo -e "  ${ORANGE}●${RESET} ${TEXT_MUTED}[$(format_time $((TIME_POSITION - 7200)))]${RESET} Alert: ${ORANGE}High CPU${RESET}"
-    echo -e "  ${PURPLE}●${RESET} ${TEXT_MUTED}[$(format_time $((TIME_POSITION - 10800)))]${RESET} Scaled: ${PURPLE}+3 containers${RESET}"
-    echo -e "  ${BLUE}●${RESET} ${TEXT_MUTED}[$(format_time $((TIME_POSITION - 14400)))]${RESET} Backup: ${BLUE}Completed${RESET}"
-    echo ""
-
-    # Comparison with now
-    echo -e "${TEXT_MUTED}╭─ COMPARISON WITH NOW ─────────────────────────────────────────────────╮${RESET}"
-    echo ""
-
-    local now_data=$(get_historical_data "$CURRENT_TIME")
-    local now_cpu=$(echo "$now_data" | grep -o 'cpu:[0-9]*' | cut -d: -f2)
-    local then_cpu=$(echo "$current_data" | grep -o 'cpu:[0-9]*' | cut -d: -f2)
-
-    if [ -n "$then_cpu" ] && [ -n "$now_cpu" ]; then
-        local cpu_diff=$((now_cpu - then_cpu))
-
-        echo -e "  ${BOLD}${TEXT_PRIMARY}CPU Change:${RESET}"
-        if [ $cpu_diff -gt 0 ]; then
-            echo -e "    ${RED}↑ +${cpu_diff}%${RESET} ${TEXT_MUTED}(increased)${RESET}"
-        elif [ $cpu_diff -lt 0 ]; then
-            echo -e "    ${GREEN}↓ ${cpu_diff}%${RESET} ${TEXT_MUTED}(decreased)${RESET}"
-        else
-            echo -e "    ${CYAN}→ No change${RESET}"
-        fi
-    fi
-    echo ""
-
-    # Time travel controls
-    echo -e "${TEXT_MUTED}╭─ TIME TRAVEL CONTROLS ────────────────────────────────────────────────╮${RESET}"
-    echo ""
-    echo -e "  ${CYAN}←${RESET} ${BOLD}1 Hour Back${RESET}        ${PURPLE}→${RESET} ${BOLD}1 Hour Forward${RESET}"
-    echo -e "  ${ORANGE}[${RESET} ${BOLD}1 Day Back${RESET}         ${PINK}]${RESET} ${BOLD}1 Day Forward${RESET}"
-    echo -e "  ${GREEN}H${RESET} ${BOLD}Go to Start${RESET}        ${GOLD}N${RESET} ${BOLD}Go to Now${RESET}"
-    echo ""
-    echo -e "  ${BOLD}${TEXT_PRIMARY}Playback Speed:${RESET}      ${CYAN}${PLAYBACK_SPEED}x${RESET}"
-    echo ""
-
-    # Snapshots
-    echo -e "${TEXT_MUTED}╭─ SAVED SNAPSHOTS ─────────────────────────────────────────────────────╮${RESET}"
-    echo ""
-    echo -e "  ${PURPLE}📸${RESET} ${BOLD}Pre-Deployment${RESET}     ${TEXT_MUTED}2024-12-20 15:30${RESET}  ${GREEN}✓${RESET}"
-    echo -e "  ${CYAN}📸${RESET} ${BOLD}After Scaling${RESET}      ${TEXT_MUTED}2024-12-18 09:15${RESET}  ${GREEN}✓${RESET}"
-    echo -e "  ${ORANGE}📸${RESET} ${BOLD}Peak Traffic${RESET}       ${TEXT_MUTED}2024-12-15 14:45${RESET}  ${GREEN}✓${RESET}"
-    echo ""
-
-    # Historical chart
-    echo -e "${TEXT_MUTED}╭─ CPU HISTORY (30 DAYS) ───────────────────────────────────────────────╮${RESET}"
-    echo ""
-
-    echo "   ${TEXT_MUTED}%${RESET}"
-    echo "  ${TEXT_MUTED}100${RESET} ${RED}│${RESET}"
-    echo "   ${TEXT_MUTED}75${RESET} ${ORANGE}│${RESET}     ${ORANGE}▄█▄${RESET}"
-    echo "   ${TEXT_MUTED}50${RESET} ${YELLOW}│${RESET}   ${YELLOW}▄█${RESET}${ORANGE}█${RESET}${YELLOW}█▄${RESET}  ${YELLOW}▄${RESET}        ${GOLD}◆${RESET} ${TEXT_MUTED}You are here${RESET}"
-    echo "   ${TEXT_MUTED}25${RESET} ${GREEN}│${RESET}${GREEN}▄██${RESET}${YELLOW}█${RESET}   ${YELLOW}█${RESET}${GREEN}██▄${RESET}"
-    echo "    ${TEXT_MUTED}0${RESET} ${TEXT_MUTED}└────────────────────────────────────────────────→${RESET}"
-    echo "       ${TEXT_MUTED}30d   25d   20d   15d   10d   5d    NOW${RESET}"
-    echo ""
-
-    echo -e "${GOLD}─────────────────────────────────────────────────────────────────────────${RESET}"
-    echo -e "  ${TEXT_SECONDARY}[←/→]${RESET} Hours  ${TEXT_SECONDARY}[[/]]${RESET} Days  ${TEXT_SECONDARY}[H]${RESET} Start  ${TEXT_SECONDARY}[N]${RESET} Now  ${TEXT_SECONDARY}[Q]${RESET} Quit"
-    echo ""
 }
 
-# Main loop
-main() {
-    init_history
+compare_snapshots() {
+    local file1="$SNAPSHOTS_DIR/${1}.json"
+    local file2="$SNAPSHOTS_DIR/${2}.json"
+
+    [[ ! -f "$file1" || ! -f "$file2" ]] && { printf "${BR_RED}Snapshot not found${RST}\n"; return 1; }
+
+    printf "${BOLD}Comparison: %s vs %s${RST}\n\n" "$1" "$2"
+    printf "%-15s %-15s %-15s %-10s\n" "METRIC" "$1" "$2" "CHANGE"
+    printf "${TEXT_MUTED}%s${RST}\n" "────────────────────────────────────────────────────"
+
+    for metric in cpu memory disk load; do
+        local val1=$(jq -r ".metrics.$metric // 0" "$file1")
+        local val2=$(jq -r ".metrics.$metric // 0" "$file2")
+        local diff=$(echo "$val2 - $val1" | bc -l 2>/dev/null || echo "0")
+        printf "%-15s %-15s %-15s %+.2f\n" "$metric" "$val1" "$val2" "$diff"
+    done
+}
+
+#───────────────────────────────────────────────────────────────────────────────
+# RECORDING SYSTEM
+#───────────────────────────────────────────────────────────────────────────────
+
+start_recording() {
+    local name="${1:-recording_$(date +%Y%m%d_%H%M%S)}"
+    local interval="${2:-5}"
+    local recording_file="$RECORDINGS_DIR/${name}.rec"
+
+    RECORDING_NAME="$name"
+    RECORDING_START=$(date +%s)
+    RECORDING_ACTIVE=true
+
+    echo "# Recording: $name" > "$recording_file"
+    echo "# Started: $(date -Iseconds)" >> "$recording_file"
+
+    touch "$recording_file.lock"
+
+    (
+        while [[ -f "$recording_file.lock" ]]; do
+            local ts=$(date +%s)
+            local cpu=$(grep 'cpu ' /proc/stat 2>/dev/null | awk '{usage=($2+$4)*100/($2+$4+$5)} END {printf "%.1f", usage}' || echo "0")
+            local mem=$(free 2>/dev/null | awk '/Mem:/ {printf "%.1f", $3/$2 * 100}' || echo "0")
+            local load=$(cat /proc/loadavg 2>/dev/null | awk '{print $1}' || echo "0")
+            echo "$ts|$cpu|$mem|$load" >> "$recording_file"
+            sleep "$interval"
+        done
+    ) &
+
+    printf "${BR_GREEN}Recording started: %s${RST}\n" "$name"
+}
+
+stop_recording() {
+    local recording_file="$RECORDINGS_DIR/${RECORDING_NAME}.rec"
+    rm -f "$recording_file.lock"
+    RECORDING_ACTIVE=false
+    printf "${BR_GREEN}Recording stopped${RST}\n"
+}
+
+list_recordings() {
+    printf "${BOLD}Recordings${RST}\n\n"
+    for f in "$RECORDINGS_DIR"/*.rec; do
+        [[ -f "$f" ]] && printf "  %s\n" "$(basename "$f" .rec)"
+    done
+}
+
+#───────────────────────────────────────────────────────────────────────────────
+# REPLAY SYSTEM
+#───────────────────────────────────────────────────────────────────────────────
+
+replay_recording() {
+    local name="$1"
+    local speed="${2:-1}"
+    local recording_file="$RECORDINGS_DIR/${name}.rec"
+
+    [[ ! -f "$recording_file" ]] && { printf "${BR_RED}Recording not found${RST}\n"; return 1; }
+
+    clear_screen
+    cursor_hide
+
+    printf "${BR_PURPLE}${BOLD}Replaying: %s (Speed: %.1fx)${RST}\n\n" "$name" "$speed"
+
+    local idx=0
+    while IFS='|' read -r ts cpu mem load; do
+        [[ ! "$ts" =~ ^[0-9]+$ ]] && continue
+        ((idx++))
+
+        printf "\r  Time: %s  CPU: %6.1f%%  MEM: %6.1f%%  Load: %s    " \
+            "$(date -d "@$ts" '+%H:%M:%S' 2>/dev/null || echo "$ts")" "$cpu" "$mem" "$load"
+
+        local delay=$(echo "1 / $speed" | bc -l 2>/dev/null || echo 1)
+        sleep "$delay"
+    done < "$recording_file"
+
+    printf "\n\n${BR_GREEN}Replay complete! (%d points)${RST}\n" "$idx"
+    cursor_show
+}
+
+#───────────────────────────────────────────────────────────────────────────────
+# EVENT LOGGING
+#───────────────────────────────────────────────────────────────────────────────
+
+log_event() {
+    echo "$(date -Iseconds)|$1|$2|$3" >> "$EVENTS_FILE"
+}
+
+show_events() {
+    printf "${BOLD}Recent Events${RST}\n\n"
+    tail -n "${1:-20}" "$EVENTS_FILE" 2>/dev/null | while IFS='|' read -r ts type source msg; do
+        printf "%-25s %-10s %-15s %s\n" "${ts:0:25}" "$type" "$source" "$msg"
+    done
+}
+
+#───────────────────────────────────────────────────────────────────────────────
+# MAIN DASHBOARD
+#───────────────────────────────────────────────────────────────────────────────
+
+time_machine_dashboard() {
+    clear_screen
+    cursor_hide
 
     while true; do
-        show_time_machine
+        cursor_to 1 1
 
-        read -rsn1 key
+        printf "${BR_PURPLE}${BOLD}"
+        printf "╔══════════════════════════════════════════════════════════════════════════════╗\n"
+        printf "║                         ⏱️  TIME MACHINE                                      ║\n"
+        printf "╚══════════════════════════════════════════════════════════════════════════════╝\n"
+        printf "${RST}\n"
 
-        # Handle escape sequences for arrow keys
-        if [[ $key == $'\x1b' ]]; then
-            read -rsn2 key
-        fi
+        local snap_count=$(ls "$SNAPSHOTS_DIR"/*.json 2>/dev/null | wc -l)
+        local rec_count=$(ls "$RECORDINGS_DIR"/*.rec 2>/dev/null | wc -l)
 
-        case "$key" in
-            '[D'|'h'|'H')  # Left arrow or H
-                if [ "$key" = "h" ] || [ "$key" = "H" ]; then
-                    # Go to start
-                    TIME_POSITION=$((CURRENT_TIME - 30 * 86400))
-                else
-                    # 1 hour back
-                    TIME_POSITION=$((TIME_POSITION - 3600))
-                fi
-                ;;
-            '[C'|'n'|'N')  # Right arrow or N
-                if [ "$key" = "n" ] || [ "$key" = "N" ]; then
-                    # Go to now
-                    TIME_POSITION=$CURRENT_TIME
-                else
-                    # 1 hour forward
-                    TIME_POSITION=$((TIME_POSITION + 3600))
-                    [ $TIME_POSITION -gt $CURRENT_TIME ] && TIME_POSITION=$CURRENT_TIME
-                fi
-                ;;
-            '[')
-                # 1 day back
-                TIME_POSITION=$((TIME_POSITION - 86400))
-                ;;
-            ']')
-                # 1 day forward
-                TIME_POSITION=$((TIME_POSITION + 86400))
-                [ $TIME_POSITION -gt $CURRENT_TIME ] && TIME_POSITION=$CURRENT_TIME
-                ;;
-            'q'|'Q')
-                echo -e "\n${CYAN}Time travel ended${RESET}\n"
-                exit 0
-                ;;
+        printf "  ${BOLD}Snapshots:${RST} ${BR_CYAN}%s${RST}  " "$snap_count"
+        printf "${BOLD}Recordings:${RST} ${BR_YELLOW}%s${RST}\n\n" "$rec_count"
+
+        [[ "$RECORDING_ACTIVE" == "true" ]] && \
+            printf "  ${BR_RED}● RECORDING:${RST} %s\n\n" "$RECORDING_NAME"
+
+        printf "${BOLD}Options:${RST}\n"
+        printf "  ${BR_CYAN}1.${RST} Take Snapshot    ${BR_CYAN}4.${RST} List Snapshots\n"
+        printf "  ${BR_CYAN}2.${RST} Start Recording  ${BR_CYAN}5.${RST} List Recordings\n"
+        printf "  ${BR_CYAN}3.${RST} Stop Recording   ${BR_CYAN}6.${RST} Replay Recording\n"
+        printf "  ${BR_CYAN}7.${RST} Compare          ${BR_CYAN}8.${RST} Events\n"
+        printf "  ${TEXT_MUTED}Q.${RST} Quit\n\n"
+
+        read -rsn1 choice
+        case "$choice" in
+            1) printf "\n${BR_CYAN}Name: ${RST}"; read -r n; take_snapshot "$n"; sleep 1 ;;
+            2) printf "\n${BR_CYAN}Name: ${RST}"; read -r n; start_recording "$n"; sleep 1 ;;
+            3) stop_recording; sleep 1 ;;
+            4) clear_screen; list_snapshots; read -rsn1 ;;
+            5) clear_screen; list_recordings; read -rsn1 ;;
+            6) printf "\n${BR_CYAN}Name: ${RST}"; read -r n; replay_recording "$n" ;;
+            7) printf "\n${BR_CYAN}Snap 1: ${RST}"; read -r s1; printf "${BR_CYAN}Snap 2: ${RST}"; read -r s2; compare_snapshots "$s1" "$s2"; read -rsn1 ;;
+            8) clear_screen; show_events 30; read -rsn1 ;;
+            q|Q) break ;;
         esac
-
-        # Keep within bounds
-        local min_time=$((CURRENT_TIME - 30 * 86400))
-        [ $TIME_POSITION -lt $min_time ] && TIME_POSITION=$min_time
+        clear_screen
     done
+    cursor_show
 }
 
-# Run
-main
+#───────────────────────────────────────────────────────────────────────────────
+# MAIN
+#───────────────────────────────────────────────────────────────────────────────
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    case "${1:-dashboard}" in
+        dashboard)   time_machine_dashboard ;;
+        snapshot)    take_snapshot "$2" ;;
+        snapshots)   list_snapshots ;;
+        compare)     compare_snapshots "$2" "$3" ;;
+        record)      start_recording "$2" "$3" ;;
+        stop)        stop_recording ;;
+        recordings)  list_recordings ;;
+        replay)      replay_recording "$2" "$3" ;;
+        events)      show_events "$2" ;;
+        log)         log_event "$2" "$3" "$4" ;;
+        *)           printf "Usage: %s [dashboard|snapshot|record|replay|...]\n" "$0" ;;
+    esac
+fi
